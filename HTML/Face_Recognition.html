@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>face_recognition</title>
+    <script src="/static/dist/face-api.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js" integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="/static/frontend.css">
+</head>
+    <body>
+        <div class="video">
+        <video onloadedmetadata="onPlay(this)" id="Video" width="500" height="360" autoplay muted></video>
+        </div>
+    </body>
+    <script>
+        $(document).ready(function(){
+          run()
+        })
+
+        async function run() {
+          Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri('/static/models'),
+          faceapi.nets.faceLandmark68Net.loadFromUri('/static/models'),
+          faceapi.nets.faceRecognitionNet.loadFromUri('/static/models')
+          ]).then(startVideo)
+        }  
+
+async function startVideo(){
+  const stream = await navigator.mediaDevices.getUserMedia({ video: {} })
+  const videoEl = $('#Video').get(0)
+  videoEl.srcObject = stream
+}
+
+async function onPlay() {
+  const socket = io();
+  const getUserLabel = () => new Promise(resolve => {
+      socket.on('labels', response => {
+        resolve(response);
+      });
+    });
+ 
+
+  const labels = await getUserLabel();
+  console.log(labels)
+  const videoEl = $('#Video').get(0)
+  let video = true;
+  let inputSize = 160
+  let scoreThreshold = 0.5
+  const canvas = faceapi.createCanvasFromMedia(videoEl);
+  $('.video').append(canvas);
+
+  const displaySize = { width: videoEl.width, height: videoEl.height };
+  faceapi.matchDimensions(canvas, displaySize);
+  //const labels = ['pravesh','tony']
+	
+	const labeledFaceDescriptors = await Promise.all(
+		labels.map(async label => {
+      console.log(label)
+      const img = await faceapi.fetchImage('/static/images/'+`${label}.png`)
+      const inputSize = 512;
+      const scoreThreshold = 0.5;
+			const fullFaceDescriptions = await faceapi.detectAllFaces(img, new faceapi.TinyFaceDetectorOptions({ inputSize, scoreThreshold })).withFaceLandmarks().withFaceDescriptors()
+			
+			if (!fullFaceDescriptions) {
+				throw new Error(`no faces detected for ${label}`)
+			}
+			
+      const faceDescriptors = [fullFaceDescriptions[0].descriptor]
+      return new faceapi.LabeledFaceDescriptors(label, faceDescriptors)
+      
+		})
+  )
+
+  setInterval(async function detect(){
+      const detections = await faceapi.detectAllFaces(videoEl, new faceapi.TinyFaceDetectorOptions({ inputSize, scoreThreshold })).withFaceLandmarks().withFaceDescriptors()
+      const resizedDetections = faceapi.resizeResults(detections, displaySize);
+      canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+      faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
+      
+      const maxDescriptorDistance = 0.6
+	    const faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, maxDescriptorDistance)
+	    const results = resizedDetections.map(fd => faceMatcher.findBestMatch(fd.descriptor))
+	
+	    results.forEach((bestMatch, i) => {
+		    const box = resizedDetections[i].detection.box
+		    const text = bestMatch.toString()
+		    const drawBox = new faceapi.draw.DrawBox(box, { label: text })
+		    drawBox.draw(canvas)
+	    })
+    },50);
+}
+
+    </script>
+</html>
