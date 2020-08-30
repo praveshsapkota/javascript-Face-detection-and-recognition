@@ -1,3 +1,6 @@
-body-parser
-express
-socket.io
+"body-parser"
+"date-and-time"
+"ejs"
+"express"
+"mysql"
+"socket.io"

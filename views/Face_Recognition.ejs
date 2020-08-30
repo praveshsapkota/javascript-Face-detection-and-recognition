@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAS</title>
+    <script src="/static/dist/face-api.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
+    <!-- CSS only -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+        integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+    <!-- JS, Popper.js, and jQuery -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
+        integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous">
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"
+        integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous">
+    </script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"
+        integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous">
+    </script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="/static/index.css">
+</head>
+
+<body>
+    <nav class="navbar navbar-dark sticky-top bg-dark flex-md-nowrap p-0 shadow">
+        <a class="navbar-brand col-md-3 col-lg-2 mr-0 px-3" href="#">FAS</a>
+        <button class="navbar-toggler position-absolute d-md-none collapsed" type="button" data-toggle="collapse"
+            data-target="#sidebarMenu" aria-controls="sidebarMenu" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <ul class="navbar-nav px-3">
+            <li class="nav-item text-nowrap">
+                <a class="nav-link" href="#">Sign out</a>
+            </li>
+        </ul>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
+                <div class="sidebar-sticky pt-3">
+                    <ul class="nav flex-column">
+                        <li class="nav-item waves-effect">
+                            <a class="nav-link" href="/">
+                                Facial Attendance System
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                Admin
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" href="/recognition">
+                                Recognition
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/register">
+                                Register
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/registered">
+                                Registered
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+            <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-md-4">
+                <h1 style="text-align: center;">Live Attandence</h1>
+                <div class="video webcam">
+                    <video onloadedmetadata="onPlay(this)" id="Video" width="400" height="250" autoplay muted></video>
+                </div>
+                <div id="table" class="table-responsive-sm">
+                    <table class="table table-striped table-bordered">
+                        <thead class="thead-dark">
+                            <tr>
+                                <th scope="col">Image</th>
+                                <th scope="col">Usn</th>
+                                <th scope="col">Name</th>
+                                <th scope="col">Department</th>
+                                <th scope="col">Semester</th>
+                                <th scope="col">Date</th>
+                            </tr>
+
+                        </thead>
+
+                        <tbody class="update_attendance">
+
+                        </tbody>
+                    </table>
+                </div>
+            </main>
+        </div>
+    </div>
+
+
+</body>
+<script>
+    $(document).ready(function () {
+        run()
+        var attendance = $('.update_attendance')
+        var current_data = [];
+        var previous_data = [];
+        setInterval(async () => {
+            previous_data = current_data
+            let response = await fetch('/attendance', {
+                method: 'get'
+            });
+            var data = await response.json();
+            current_data = data;
+            console.log(current_data);
+            if (previous_data.length != current_data.length) {
+                attendance.empty();
+                for (i = 0; i < current_data.length; i++) {
+                    var table_row = '<tr>'
+                    table_row +=
+                        `<td><img class="img-fluid register_img" src="/static/images/${data[i].NAME}_${data[i].USN}.png" alt="no image"></td>`
+                    table_row +=
+                        `<td>${data[i].USN}</td><td>${data[i].NAME}</td><td>${data[i].DEPARTMENT}</td><td>${data[i].SEMESTER}</td><td>${data[i].Date}</td>`
+                    table_row += '</tr>'
+                    attendance.append(table_row);
+                }
+            }
+        }, 2000)
+    })
+
+    async function run() {
+        Promise.all([
+            faceapi.nets.tinyFaceDetector.loadFromUri('/static/models'),
+            faceapi.nets.faceLandmark68Net.loadFromUri('/static/models'),
+            faceapi.nets.faceRecognitionNet.loadFromUri('/static/models')
+        ]).then(startVideo)
+    }
+
+    async function startVideo() {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {}
+        })
+        const videoEl = $('#Video').get(0)
+        videoEl.srcObject = stream
+    }
+
+    async function onPlay() {
+        const socket = io();
+        const getUserLabel = () => new Promise(resolve => {
+            socket.on('labels', response => {
+                resolve(response);
+            });
+        });
+        const labels = await getUserLabel();
+        const videoEl = $('#Video').get(0)
+        let video = true;
+        let inputSize = 320
+        let scoreThreshold = 0.5
+        const canvas = faceapi.createCanvasFromMedia(videoEl);
+        $('.video').append(canvas);
+
+        const displaySize = {
+            width: videoEl.width,
+            height: videoEl.height
+        };
+        faceapi.matchDimensions(canvas, displaySize);
+
+        const labeledFaceDescriptors = await Promise.all(
+            labels.map(async label => {
+                const img = await faceapi.fetchImage('/static/images/' + `${label}.png`)
+                const inputSize = 320;
+                const scoreThreshold = 0.5;
+                const fullFaceDescriptions = await faceapi.detectAllFaces(img, new faceapi
+                    .TinyFaceDetectorOptions({
+                        inputSize,
+                        scoreThreshold
+                    })).withFaceLandmarks().withFaceDescriptors()
+                if (!fullFaceDescriptions) {
+                    throw new Error(`no faces detected for ${label}`)
+                }
+
+                const faceDescriptors = [fullFaceDescriptions[0].descriptor]
+                return new faceapi.LabeledFaceDescriptors(label, faceDescriptors)
+
+            })
+        )
+
+        setInterval(async function detect() {
+            const detections = await faceapi.detectAllFaces(videoEl, new faceapi
+                .TinyFaceDetectorOptions({
+                    inputSize,
+                    scoreThreshold
+                })).withFaceLandmarks().withFaceDescriptors()
+            const resizedDetections = faceapi.resizeResults(detections, displaySize);
+            canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+            faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
+
+            const maxDescriptorDistance = 0.6
+            const faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, maxDescriptorDistance)
+            const results = resizedDetections.map(fd => faceMatcher.findBestMatch(fd.descriptor))
+
+            results.forEach((bestMatch, i) => {
+                const box = resizedDetections[i].detection.box
+                const text = bestMatch.toString().split(' ')[0]
+                socket.emit('recognized', text)
+                const drawBox = new faceapi.draw.DrawBox(box, {
+                    label: text
+                })
+                drawBox.draw(canvas)
+            })
+        }, 100);
+    }
+</script>
+
+</html>

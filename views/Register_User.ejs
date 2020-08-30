@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAS</title>
+    <!-- CSS only -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+        integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+    <!-- JS, Popper.js, and jQuery -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
+        integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous">
+    </script>
+    <script type="text/javascript" src="https://unpkg.com/webcam-easy/dist/webcam-easy.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"
+        integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous">
+    </script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"
+        integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous">
+    </script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="/static/index.css">
+</head>
+
+<body>
+    <nav class="navbar navbar-dark sticky-top bg-dark flex-md-nowrap p-0 shadow">
+        <a class="navbar-brand col-md-3 col-lg-2 mr-0 px-3" href="#">FAS</a>
+        <button class="navbar-toggler position-absolute d-md-none collapsed" type="button" data-toggle="collapse"
+            data-target="#sidebarMenu" aria-controls="sidebarMenu" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <ul class="navbar-nav px-3">
+            <li class="nav-item text-nowrap">
+                <a class="nav-link" href="#">Sign out</a>
+            </li>
+        </ul>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row ">
+            <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
+                <div class="sidebar-sticky pt-3">
+                    <ul class="nav flex-column">
+                        <li class="nav-item ">
+                            <a class="nav-link" href="/">
+                                Facial Attendance System
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                Admin
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/recognition">
+                                Recognition
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" href="/register">
+                                Register
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/registered">
+                                Registered
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+            <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-md-4">
+                <canvas id="canvas" class="d-none"></canvas>
+                <div class="webcam embed-responsive embed-responsive-16by9">
+                    <video class="video-register" id="webcam" autoplay playsinline width="500" height="300"></video>
+                </div>
+                <div class="buttons">
+                    <button id="start">start</button>
+                    <button id="stop">stop</button>
+                    <button id="snap">snap</button>
+                </div>
+                <hr>
+                <div class="container">
+                    <div class="row clicked_images">
+                    </div>
+
+                </div>
+                <hr>
+                <div class="buttons"><button id="uplode">uplode</button></div>
+                <br>
+                <br>
+                <div>
+                <input id="name" type="text" placeholder="Full_Name" name="name">
+                <input id="dep" type="text" placeholder="Department" name="dep">
+                <input id="sem" type="text" placeholder="Semester" name="sem">
+                <input id="usn" type="text" placeholder="USN" name="usn">
+                <div class="buttons"><button id="submitt">submitt_data</button></div>
+            </div>
+            </main>
+        </div>
+    </div>
+
+
+</body>
+<script>
+    $(document).ready(function () {
+
+        const webcamElement = $('#webcam')[0];
+        const canvasElement = $('#canvas')[0];
+        const webcam = new Webcam(webcamElement, 'user', canvasElement);
+        const socket = io();
+
+
+
+        $("#start").on('click', function () {
+            webcam.start()
+                .then(result => {
+                    console.log("webcam started");
+                })
+                .catch(err => {
+                    console.log(err);
+                });
+        });
+
+        $("#stop").on('click', function () {
+            webcam.stop();
+            webcamElement.srcObject = null;
+        });
+
+
+        imagedata = [];
+        var i = 0;
+
+
+        $("#snap").on('click', function () {
+            var pic = webcam.snap();
+            canvasElement.remove();
+            imagedata.push(pic);
+            var img = $('<img></img>').attr({
+                id: "imgclicked" + [i],
+                src: imagedata[i],
+                class: 'imgview' + ' ' + 'img-fluid'
+            });
+            $('.clicked_images').append(img);
+            i++;
+        });
+
+        var choosed_image_no = [];
+
+        $('.clicked_images').click(function (event) {
+            choosed_image_no.push($(event.target)[0].id);
+            $(event.target).attr({
+                class: 'selected' + ' ' + 'imgview' + ' ' + 'img-fluid'
+            });
+
+        })
+
+
+        var choosed_image = {};
+        var k;
+
+        function choose_image() {
+            choosed_image = 0;
+
+            for (k = 0; k < choosed_image_no.length; k++) {
+                var id = choosed_image_no[k];
+                var img = $('#' + id).attr('src');
+                choosed_image = {img};
+
+            }
+        };
+
+
+        $('#uplode').on('click', function () {
+            choose_image();
+            console.log(choosed_image);
+        })
+
+        $("#submitt").on('click', async function (event) {
+            var usn = $('#usn').val();
+            var name = $('#name').val();
+            var dep = $('#dep').val();
+            var sem = $('#sem').val();
+
+            var data = {usn:usn,name:name,dep:dep,sem:sem,choosed_image}
+            socket.emit('userdata',data);
+            $('.clicked_images').empty();
+            choosed_image = {};
+
+            setTimeout(()=>{
+                alert('new user added named '+name+' of usn '+usn);
+            },2000)
+            
+        });
+    });
+</script>
+
+</html>
