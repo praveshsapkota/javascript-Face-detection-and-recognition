@@ -104,9 +104,9 @@ io.on('connect', socket => {
         var usn = data.usn;
         var imgdata = data.choosed_image.img;
         console.log(name, department, semester, usn)
-        if(name != undefined || usn != undefined || department != undefined || semester != undefined|| imgdata != undefined){
+        if(name != undefined && usn != undefined && department != undefined && semester != undefined && imgdata != undefined){
             query = `INSERT INTO register VALUES('${usn}','${name}','${department}','${semester}')`
-        db.query(query, (err, response) => {
+            db.query(query, (err, response) => {
             if (err) {
                 console.error(err.sqlMessage);
                 return;
